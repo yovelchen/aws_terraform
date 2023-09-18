@@ -10,9 +10,9 @@ resource "aws_vpc" "main" {
 
 # subnet is a logical subdivision of an IP network.It further divides a VPC into multiple small networks so that they can be managed seperately.
 resource "aws_subnet" "public_subnet" {
-  vpc_id     = aws_vpc.main.id
-  cidr_block = "10.0.1.0/24"
-  availability_zone = "${var.region}a" 
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.1.0/24"
+  availability_zone = "${var.region}a"
   #map_public_ip_on_launch = true -- provide internet access to instances in a subnet, may come with higher cost and dynamic IPs. (a better option is eip) 
 
   tags = {
@@ -21,9 +21,9 @@ resource "aws_subnet" "public_subnet" {
 }
 
 resource "aws_subnet" "private_subnet" {
-  vpc_id     = aws_vpc.main.id
-  cidr_block = "10.0.2.0/24"
-  availability_zone = "${var.region}a" 
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.2.0/24"
+  availability_zone = "${var.region}a"
 
   tags = {
     Name = "private_subnet"
@@ -79,32 +79,32 @@ resource "aws_security_group" "allow_web" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description      = "WEB"
-    from_port        = 443
-    to_port          = 443
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
+    description = "WEB"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
   ingress {
-    description      = "WEB"
-    from_port        = 80
-    to_port          = 80
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
+    description = "WEB"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
   ingress {
-    description      = "WEB"
-    from_port        = 22
-    to_port          = 22
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
+    description = "WEB"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = ["0.0.0.0/0"]
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   tags = {
@@ -118,11 +118,11 @@ resource "aws_security_group" "allow_private" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description      = "private"
-    from_port        = 22
-    to_port          = 22
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
+    description = "private"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
 
   }
 
@@ -151,7 +151,7 @@ resource "aws_eip" "web-ip" {
   instance                  = aws_instance.web-instance.id
   network_interface         = aws_network_interface.web-server-nic.id
   associate_with_private_ip = aws_instance.web-instance.private_ip
-  depends_on = [ aws_internet_gateway.gateway ]
+  depends_on                = [aws_internet_gateway.gateway]
 
 }
 
@@ -169,7 +169,7 @@ resource "aws_key_pair" "web-key" {
 
 resource "local_file" "web_key" {
   filename = "${path.module}\\web_key.pem"
-  content = tls_private_key.web_ssh.private_key_pem
+  content  = tls_private_key.web_ssh.private_key_pem
 }
 
 resource "tls_private_key" "private_ssh" {
@@ -180,21 +180,21 @@ resource "tls_private_key" "private_ssh" {
 resource "aws_key_pair" "private-key" {
   key_name   = "private-key"
   public_key = tls_private_key.private_ssh.public_key_openssh
-  
+
 }
 
 resource "local_file" "private_key" {
   filename = "${path.module}\\private_key.pem"
-  content = tls_private_key.private_ssh.private_key_pem
+  content  = tls_private_key.private_ssh.private_key_pem
 }
 
 
 resource "aws_instance" "web-instance" {
-  ami           = "ami-053b0d53c279acc90"
-  instance_type = "t2.micro"
-  subnet_id = aws_subnet.public_subnet.id
-  key_name = aws_key_pair.web-key.key_name
-  
+  ami           = var.ami
+  instance_type = var.instance_type
+  subnet_id     = aws_subnet.public_subnet.id
+  key_name      = aws_key_pair.web-key.key_name
+
   user_data = <<-EOF
               #!/bin/bash
               sudo apt update -y 
@@ -215,11 +215,11 @@ resource "aws_network_interface_sg_attachment" "web_sg_attachment" {
 
 # there are a lot of usecases where your instances in private subnet needs access to the internet This can be done securely using NAT Gateway which allows instances in the private subnet to connect to the internet via a secure route.
 resource "aws_instance" "private-instance" {
-  ami           = "ami-053b0d53c279acc90"
-  instance_type = "t2.micro"
-  subnet_id = aws_subnet.private_subnet.id
-  key_name = aws_key_pair.private-key.id
-  
+  ami           = var.ami
+  instance_type = var.instance_type
+  subnet_id     = aws_subnet.private_subnet.id
+  key_name      = aws_key_pair.private-key.id
+
   tags = {
     Name = "private-instance"
   }
@@ -229,3 +229,5 @@ resource "aws_network_interface_sg_attachment" "private_sg_attachment" {
   security_group_id    = aws_security_group.allow_private.id
   network_interface_id = aws_instance.private-instance.primary_network_interface_id
 }
+
+#scp -i web_key.pem private_key.pem ubuntu@44.219.224.102:/home/ubuntu/private-key
